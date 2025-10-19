@@ -93,9 +93,11 @@ def generate_data(
             # Combine components and ensure non-negative values
             sales = base_demand + trend + seasonality + noise
             sales = np.maximum(sales, 0)  # Ensure non-negative
+            sales = np.round(sales).astype(int)  # Convert to integers
             
             # Assign initial inventory (random between 200-500)
             inventory = np.random.uniform(200, 500, n_weeks)
+            inventory = np.round(inventory).astype(int)  # Convert to integers
             
             # Generate random customer IDs (format: CUST_XXXX)
             customer_ids = [f"CUST_{np.random.randint(1000, 9999)}" for _ in range(n_weeks)]

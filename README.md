@@ -34,14 +34,32 @@ SC_Labs/
 │   ├── router.py          # Router class with truck assignment
 │   ├── utils/             # Routing utilities
 │   └── __init__.py
+├── notebooks/             # Jupyter notebooks for interactive exploration
+│   ├── 01_data_generation.ipynb
+│   ├── 02_forecasting.ipynb
+│   ├── 03_inventory_optimization.ipynb
+│   ├── 04_delivery_routing.ipynb
+│   └── README.md
+├── tests/                 # Test suite
+│   ├── test_auxiliar.py
+│   ├── test_forecaster.py
+│   ├── test_optimizer.py
+│   ├── test_router.py
+│   ├── test_integration.py
+│   └── README.md
 ├── docs/                  # Module documentation
-│   ├── auxiliar.md        # Auxiliar module documentation
-│   ├── forecaster.md      # Forecaster module documentation
-│   ├── optimizer.md       # Optimizer module documentation
-│   └── router.md          # Router module documentation
-├── outputs/               # Generated output files (created at runtime)
+│   ├── auxiliar.md
+│   ├── forecaster.md
+│   ├── optimizer.md
+│   └── router.md
+├── output/                # Generated output files
+├── app/                   # Streamlit web dashboard
+│   └── app.py             # Main dashboard application
 ├── main.py                # Main orchestration script
+├── setup.py               # Automated setup script
+├── run_app.py             # Streamlit app launcher
 ├── requirements.txt       # Python dependencies
+├── config.yaml            # Configuration file
 └── README.md              # This file
 ```
 
@@ -52,23 +70,60 @@ SC_Labs/
 - Python >= 3.10
 - pip package manager
 
-### Setup
+### Quick Setup
 
 1. Clone or download this repository
 
-2. Install dependencies:
+2. Run the automated setup script:
+```bash
+python setup.py
+```
+
+This will:
+- Create all necessary output directories
+- Install all Python dependencies from requirements.txt
+- Install Streamlit for the web dashboard
+- Verify the installation
+
+### Manual Setup
+
+Alternatively, install dependencies manually:
 ```bash
 pip install -r requirements.txt
+pip install streamlit>=1.28.0
 ```
 
 This will install:
 - pandas (data manipulation)
 - numpy (numerical operations)
 - gluonts (time series forecasting)
-- mxnet (GluonTS backend)
+- torch (PyTorch backend for GluonTS)
 - scipy (statistical functions)
+- streamlit (web dashboard)
 
 ## Usage
+
+### Web Dashboard (Recommended)
+
+Launch the interactive dashboard using the app runner:
+
+```bash
+python run_app.py
+```
+
+Or directly with Streamlit:
+
+```bash
+streamlit run app/app.py
+```
+
+Navigate through 4 sections:
+1. **Data Generation** - Create synthetic data
+2. **Forecasting** - Train models and predict
+3. **Inventory** - Optimize stock levels
+4. **Routing** - Plan deliveries
+
+The dashboard will open in your browser at http://localhost:8501
 
 ### Basic Usage
 
@@ -168,6 +223,43 @@ When using the `--save` flag, the following CSV files are generated in the `outp
 - `deliveries_YYYYMMDD_HHMMSS.csv`: Delivery assignments with truck and customer details
 - `routes_YYYYMMDD_HHMMSS.csv`: Route summaries with distances and stop sequences
 
+## 🌐 Web Dashboard
+
+Launch the interactive Streamlit dashboard for a complete visual experience:
+
+```bash
+# Quick start (recommended)
+python run_app.py
+
+# Or directly with Streamlit
+streamlit run app/app.py
+```
+
+**Features:**
+- 📊 Interactive data generation with real-time visualization
+- 📈 Neural network forecasting with accuracy metrics
+- 📦 Inventory optimization with dynamic charts
+- 🚚 Route planning with truck utilization analysis
+
+The dashboard provides a user-friendly interface to explore all supply chain optimization modules without writing code.
+
+## 📓 Interactive Notebooks
+
+Explore the pipeline interactively with Jupyter notebooks in the `notebooks/` directory:
+
+- **[01_data_generation.ipynb](notebooks/01_data_generation.ipynb)** - Generate synthetic sales data
+- **[02_forecasting.ipynb](notebooks/02_forecasting.ipynb)** - Train forecasting models and predict demand
+- **[03_inventory_optimization.ipynb](notebooks/03_inventory_optimization.ipynb)** - Optimize inventory levels
+- **[04_delivery_routing.ipynb](notebooks/04_delivery_routing.ipynb)** - Plan and optimize delivery routes
+
+Each notebook includes:
+- Step-by-step explanations
+- Rich visualizations
+- Interactive analysis
+- Saves outputs for the next stage
+
+See [notebooks/README.md](notebooks/README.md) for details.
+
 ## Module Documentation
 
 Detailed documentation for each module is available in the `docs/` directory:
@@ -193,11 +285,52 @@ Each module is independently testable and can be used standalone or as part of t
 
 ### Running Tests
 
-Unit tests can be found in each module's test files (when implemented):
+All tests are located in the `tests/` directory:
 
 ```bash
-pytest
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test file
+python -m pytest tests/test_integration.py -v
+
+# Run with coverage
+python -m pytest tests/ --cov=. --cov-report=html
 ```
+
+See [tests/README.md](tests/README.md) for detailed test documentation.
+
+### Preventing __pycache__ Directories
+
+The project is configured to prevent Python from creating `__pycache__` directories:
+
+**Option 1: Environment Variable (Recommended)**
+```bash
+# Set environment variable before running Python
+export PYTHONDONTWRITEBYTECODE=1  # Linux/Mac
+set PYTHONDONTWRITEBYTECODE=1     # Windows CMD
+$env:PYTHONDONTWRITEBYTECODE=1    # Windows PowerShell
+
+# Or add to your .env file (already configured)
+PYTHONDONTWRITEBYTECODE=1
+```
+
+**Option 2: Run Python with -B flag**
+```bash
+python -B main.py
+python -B -m pytest tests/
+```
+
+**Option 3: Clean existing cache**
+```bash
+# Use the provided cleanup script
+python clean_pycache.py
+
+# Or manually with PowerShell
+Get-ChildItem -Path . -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+```
+
+The `.gitignore` file is already configured to exclude `__pycache__/` directories from version control
 
 ### Extending the System
 

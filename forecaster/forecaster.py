@@ -5,12 +5,26 @@ This module provides time series forecasting capabilities for supply chain
 demand planning using the GluonTS library with SimpleFeedForwardEstimator.
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from typing import List, Optional
 import pandas as pd
 import numpy as np
+import warnings
+import logging
+import os
+
 from gluonts.dataset.pandas import PandasDataset
 from gluonts.torch import SimpleFeedForwardEstimator
-from gluonts.torch.model.simple_feedforward import SimpleFeedForwardNetworkTrainer
+
+from utils.logger import Logger, suppress_warnings
+from utils.config import get_config
+
+# Suppress warnings and verbose logging
+suppress_warnings()
+os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = '0'
 
 
 class Forecaster:
@@ -49,7 +63,8 @@ class Forecaster:
         date_col: str = 'date',
         target_col: str = 'sales',
         frequency: str = 'W',
-        forecast_horizon: int = 4
+        forecast_horizon: int = 4,
+        verbose: bool = None
     ) -> None:
         """
         Initialize the Forecaster with configuration parameters.
@@ -62,6 +77,7 @@ class Forecaster:
             frequency: Pandas frequency string for the time series
                 ('W' = weekly, 'D' = daily, 'M' = monthly, etc.)
             forecast_horizon: Number of future periods to forecast
+            verbose: Show detailed logs (None = use config)
         """
         self.primary_keys = primary_keys
         self.date_col = date_col
@@ -69,6 +85,13 @@ class Forecaster:
         self.frequency = frequency
         self.forecast_horizon = forecast_horizon
         self.model: Optional[object] = None
+        
+        # Load config
+        self.config = get_config()
+        self.verbose = verbose if verbose is not None else self.config.get('forecasting', 'verbose', default=False)
+        
+        # Initialize logger
+        self.logger = Logger('Forecaster', use_colors=self.config.get('logging', 'use_colors', default=True))
 
     def prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -152,10 +175,10 @@ class Forecaster:
             )
             
             # Fill missing values with forward fill
-            merged[self.target_col] = merged[self.target_col].fillna(method='ffill')
+            merged[self.target_col] = merged[self.target_col].ffill()
             
             # If still NaN at the beginning, use backward fill
-            merged[self.target_col] = merged[self.target_col].fillna(method='bfill')
+            merged[self.target_col] = merged[self.target_col].bfill()
             
             # If still NaN (all values were NaN), fill with 0
             merged[self.target_col] = merged[self.target_col].fillna(0)
@@ -199,12 +222,15 @@ class Forecaster:
         if df.empty:
             raise ValueError("Training DataFrame is empty")
         
+        # Log start
+        if self.verbose:
+            self.logger.info(f"Training forecaster on {len(df)} records")
+        
         # Warn if insufficient history
         min_periods = self.forecast_horizon * 2
         for keys, group in df.groupby(self.primary_keys):
             if len(group) < min_periods:
-                print(f"Warning: Time series {keys} has only {len(group)} periods. "
-                      f"Recommended minimum: {min_periods}")
+                self.logger.warning(f"Time series {keys} has only {len(group)} periods (recommended: {min_periods})")
         
         # Prepare data
         df_clean = self.prepare_data(df)
@@ -231,6 +257,9 @@ class Forecaster:
                 self.target_col: 'target'
             })
             
+            # Ensure target is float32 type for GluonTS (PyTorch compatibility)
+            gluon_df['target'] = gluon_df['target'].astype('float32')
+            
             # Create PandasDataset
             dataset = PandasDataset.from_long_dataframe(
                 gluon_df[['item_id', 'timestamp', 'target']],
@@ -240,18 +269,42 @@ class Forecaster:
                 freq=self.frequency
             )
             
+            # Get model config
+            model_type = self.config.get('forecasting', 'model', default='simple_feedforward')
+            epochs = self.config.get('forecasting', 'epochs', default=10)
+            lr = self.config.get('forecasting', 'learning_rate', default=0.001)
+            
             # Initialize SimpleFeedForwardEstimator
             estimator = SimpleFeedForwardEstimator(
                 prediction_length=self.forecast_horizon,
-                freq=self.frequency,
+                lr=lr,
                 trainer_kwargs={
-                    "max_epochs": 10,
-                    "learning_rate": 1e-3
+                    "max_epochs": epochs,
+                    "enable_progress_bar": self.config.get('forecasting', 'show_progress', default=False),
+                    "enable_model_summary": False
                 }
             )
             
-            # Train the model
-            self.model = estimator.train(dataset)
+            # Suppress output during training
+            if not self.verbose:
+                import sys
+                import io
+                old_stdout = sys.stdout
+                old_stderr = sys.stderr
+                sys.stdout = io.StringIO()
+                sys.stderr = io.StringIO()
+            
+            try:
+                # Train the model
+                self.model = estimator.train(dataset)
+                
+                if self.verbose:
+                    self.logger.success("Model trained successfully")
+            finally:
+                # Restore output
+                if not self.verbose:
+                    sys.stdout = old_stdout
+                    sys.stderr = old_stderr
             
         except Exception as e:
             raise RuntimeError(f"Model training failed: {str(e)}") from e
@@ -319,6 +372,9 @@ class Forecaster:
                     self.date_col: 'timestamp',
                     self.target_col: 'target'
                 })
+                
+                # Ensure target is float32 type for GluonTS (PyTorch compatibility)
+                gluon_df['target'] = gluon_df['target'].astype('float32')
                 
                 # Create dataset for this time series
                 dataset = PandasDataset.from_long_dataframe(

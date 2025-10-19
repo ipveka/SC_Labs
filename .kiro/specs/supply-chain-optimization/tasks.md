@@ -7,16 +7,9 @@
   - _Requirements: 5.1, 5.2_
 
 - [x] 2. Implement Auxiliar module for synthetic data generation
-
-
-
-
-
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [x] 2.1 Create generate_data() function in auxiliar/auxiliar.py
-
-
   - Implement function signature with parameters: n_stores, n_products, n_weeks, start_date, seed
   - Generate date range using pd.date_range() with weekly frequency
   - Create all combinations of stores (A, B, C...) and products (X, Y...)
@@ -26,16 +19,14 @@
   - Return DataFrame with columns: store, product, date, sales, inventory, customer_id, destination
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ]* 2.2 Write unit tests for data generation
+- [x] 2.2 Write unit tests for data generation
   - Test output schema matches specification
   - Test data dimensions (rows = n_stores × n_products × n_weeks)
   - Test reproducibility with same seed
   - Test non-negative sales values
   - _Requirements: 4.1, 4.2, 4.3_
 
-
 - [x] 2.3 Create auxiliar.md documentation
-
   - Document module overview and purpose
   - Document function parameters and return values
   - Include example output table
@@ -43,25 +34,16 @@
   - _Requirements: 5.3, 5.4_
 
 - [x] 3. Implement Forecaster module for demand forecasting
-
-
-
-
-
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
 - [x] 3.1 Create Forecaster class in forecaster/forecaster.py
-
-
   - Implement __init__ method with parameters: primary_keys, date_col, target_col, frequency, forecast_horizon
   - Add type hints for all parameters
   - Initialize model attribute as None
   - Add docstring explaining class purpose and parameters
   - _Requirements: 1.1_
 
-
 - [x] 3.2 Implement prepare_data() method
-
   - Aggregate data by primary_keys and date_col
   - Ensure continuous date range using pd.date_range()
   - Fill missing values with forward fill method
@@ -70,8 +52,6 @@
   - _Requirements: 1.2, 1.6_
 
 - [x] 3.3 Implement fit() method
-
-
   - Convert DataFrame to GluonTS PandasDataset format
   - Group data by primary_keys to create multiple time series
   - Initialize SimpleFeedForwardEstimator with prediction_length=forecast_horizon
@@ -80,9 +60,7 @@
   - Add error handling for training failures
   - _Requirements: 1.3_
 
-
 - [x] 3.4 Implement predict() method
-
   - Use trained model to generate forecasts for forecast_horizon periods
   - Create predictions for each primary_key combination
   - Combine historical data with sample='train' and prediction=NaN
@@ -90,7 +68,7 @@
   - Return unified DataFrame with all required columns
   - _Requirements: 1.4, 1.5_
 
-- [ ]* 3.5 Write unit tests for Forecaster
+- [x] 3.5 Write unit tests for Forecaster
   - Test prepare_data() with missing dates
   - Test fit() with minimal valid dataset
   - Test predict() output schema and dimensions
@@ -98,8 +76,6 @@
   - _Requirements: 1.2, 1.3, 1.4_
 
 - [x] 3.6 Create forecaster.md documentation
-
-
   - Document module overview and GluonTS usage
   - Document class initialization parameters
   - Document each method with inputs/outputs
@@ -107,24 +83,15 @@
   - _Requirements: 5.3, 5.4_
 
 - [x] 4. Implement Optimizer module for inventory simulation
-
-
-
-
-
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
 
-
 - [x] 4.1 Create Optimizer class in optimizer/optimizer.py
-
   - Implement __init__ method with parameters: primary_keys, date_col, target_col, inv_col, planning_horizon, service_level, review_period, lead_time
   - Add type hints and parameter validation
   - Add docstring explaining inventory policy
   - _Requirements: 2.1_
 
 - [x] 4.2 Implement calculate_safety_stock() method
-
-
   - Calculate standard deviation of demand series
   - Compute z-score from service_level using scipy.stats.norm.ppf()
   - Return safety stock: z_score * std_dev * sqrt(lead_time)
@@ -132,15 +99,11 @@
   - _Requirements: 2.2, 2.3_
 
 - [x] 4.3 Implement calculate_reorder_point() method
-
-
   - Calculate reorder point: (avg_demand * lead_time) + safety_stock
   - Return reorder point value
   - _Requirements: 2.3_
 
 - [x] 4.4 Implement simulate() method
-
-
   - Group input DataFrame by primary_keys
   - For each group, calculate safety stock and reorder point
   - Initialize inventory from inv_col
@@ -154,7 +117,7 @@
   - Return consolidated DataFrame with all simulation columns
   - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8_
 
-- [ ]* 4.5 Write unit tests for Optimizer
+- [x] 4.5 Write unit tests for Optimizer
   - Test safety stock calculation with known variance
   - Test reorder point calculation
   - Test simulation with zero lead time
@@ -162,9 +125,7 @@
   - Test shipment arrival after lead time
   - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6_
 
-
 - [x] 4.6 Create optimizer.md documentation
-
   - Document module overview and inventory policy
   - Document class parameters and their impact
   - Document simulation logic flow
@@ -172,24 +133,15 @@
   - _Requirements: 5.3, 5.4_
 
 - [x] 5. Implement Router module for delivery routing
-
-
-
-
-
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
 - [x] 5.1 Create Router class in router/router.py
-
-
   - Implement __init__ method with parameters: primary_keys, date_col, target_col, max_payload, origin
   - Initialize customers_db as None
   - Add type hints and docstring
   - _Requirements: 3.1_
 
-
 - [x] 5.2 Implement generate_customers() method
-
   - Create n_customers customer records with unique IDs
   - Generate random 5-digit postal codes
   - Return DataFrame with columns: customer_id, destination
@@ -197,8 +149,6 @@
   - _Requirements: 3.2_
 
 - [x] 5.3 Implement distribute_demand() method
-
-
   - For each (store, product, date) combination in forecast data
   - Randomly select customers from customers_db
   - Split sales quantity evenly across selected customers
@@ -207,8 +157,6 @@
   - _Requirements: 3.3_
 
 - [x] 5.4 Implement assign_trucks() method
-
-
   - Group deliveries by date
   - For each date, sort deliveries by destination for locality
   - Assign deliveries to trucks sequentially
@@ -219,8 +167,6 @@
   - _Requirements: 3.4_
 
 - [x] 5.5 Implement optimize_routes() method
-
-
   - Group deliveries by truck
   - For each truck, extract unique destinations
   - Calculate simple distance heuristic (postal code numeric difference)
@@ -230,7 +176,7 @@
   - Route summary columns: truck, route_order, origin, destinations, total_distance
   - _Requirements: 3.5, 3.6, 3.7, 3.8_
 
-- [ ]* 5.6 Write unit tests for Router
+- [x] 5.6 Write unit tests for Router
   - Test customer generation count and uniqueness
   - Test demand distribution sums to original forecast
   - Test truck assignment respects max_payload
@@ -238,8 +184,6 @@
   - _Requirements: 3.2, 3.3, 3.4, 3.5_
 
 - [x] 5.7 Create router.md documentation
-
-
   - Document module overview and routing approach
   - Document class parameters and methods
   - Document routing algorithm (nearest neighbor heuristic)
@@ -247,16 +191,9 @@
   - _Requirements: 5.3, 5.4_
 
 - [x] 6. Implement main orchestration script
-
-
-
-
-
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-
 - [x] 6.1 Create main.py with workflow orchestration
-
   - Import all modules (auxiliar, Forecaster, Optimizer, Router)
   - Implement main() function with complete workflow
   - Generate synthetic data using auxiliar.generate_data()
@@ -268,7 +205,6 @@
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.7_
 
 - [x] 6.2 Implement print_summary() helper function
-
   - Display summary statistics for forecasts (RMSE, MAE if actuals available)
   - Display inventory summary (avg inventory, stockouts, orders placed)
   - Display routing summary (total trucks, total distance, avg payload)
@@ -276,7 +212,6 @@
   - _Requirements: 6.5_
 
 - [x] 6.3 Implement save_outputs() helper function
-
   - Create outputs/ directory if it doesn't exist
   - Save forecasts to outputs/forecasts.csv
   - Save inventory plan to outputs/inventory_plan.csv
@@ -285,7 +220,6 @@
   - Add timestamp to filenames for versioning
   - _Requirements: 6.6_
 
-
 - [x] 6.4 Add command-line interface
   - Use argparse to accept parameters (n_stores, n_products, n_weeks, etc.)
   - Add --save flag to enable output saving
@@ -293,7 +227,13 @@
   - Add if __name__ == "__main__": block
   - _Requirements: 6.1, 6.6_
 
-- [ ]* 6.5 Write integration test for end-to-end workflow
+- [x] 6.5 Write integration test for end-to-end workflow
+
+
+
+
+
+
   - Test complete pipeline with small dataset (1 store, 1 product, 20 weeks)
   - Verify forecaster output format
   - Verify optimizer output format
@@ -302,16 +242,9 @@
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.7_
 
 - [x] 7. Final integration and documentation
-
-
-
-
-
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
 - [x] 7.1 Create project README.md
-
-
   - Add project overview and goals
   - Add installation instructions (pip install -r requirements.txt)
   - Add usage examples (running main.py)
@@ -321,8 +254,6 @@
   - _Requirements: 5.3, 5.4, 5.5_
 
 - [x] 7.2 Verify all module documentation is complete
-
-
   - Check forecaster.md completeness
   - Check optimizer.md completeness
   - Check router.md completeness
@@ -331,8 +262,6 @@
   - _Requirements: 5.3, 5.4_
 
 - [x] 7.3 Add inline code comments and docstrings
-
-
   - Review all classes for complete docstrings
   - Review all methods for parameter and return documentation
   - Add inline comments for complex logic sections
@@ -340,8 +269,6 @@
   - _Requirements: 5.5, 5.6_
 
 - [x] 7.4 Create requirements.txt with pinned versions
-
-
   - List all required packages with version constraints
   - Test installation in clean virtual environment
   - Document Python version requirement (>=3.10)

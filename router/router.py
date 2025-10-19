@@ -46,7 +46,22 @@ class Router:
             target_col: Name of the target variable column (default: 'sales')
             max_payload: Maximum units that can be loaded on a single truck (default: 10)
             origin: Starting postal code for all delivery routes (default: '08020')
+        
+        Raises:
+            ValueError: If parameters are invalid
         """
+        # Validate primary_keys
+        if not primary_keys or len(primary_keys) == 0:
+            raise ValueError("primary_keys must contain at least one column name")
+        
+        # Validate max_payload
+        if max_payload <= 0:
+            raise ValueError("max_payload must be positive")
+        
+        # Validate origin format
+        if not (isinstance(origin, str) and len(origin) == 5 and origin.isdigit()):
+            raise ValueError("origin must be a 5-digit postal code string")
+        
         self.primary_keys = primary_keys
         self.date_col = date_col
         self.target_col = target_col
@@ -103,8 +118,12 @@ class Router:
         else:
             forecast_df = df.copy()
         
-        # Filter out rows with zero or negative sales
-        forecast_df = forecast_df[forecast_df[self.target_col] > 0].copy()
+        # Filter out rows with zero or negative sales/predictions
+        # Use prediction column if available (for forecasts), otherwise use target_col
+        if 'prediction' in forecast_df.columns:
+            forecast_df = forecast_df[forecast_df['prediction'] > 0].copy()
+        else:
+            forecast_df = forecast_df[forecast_df[self.target_col] > 0].copy()
         
         deliveries = []
         
@@ -122,8 +141,15 @@ class Router:
             if pd.isna(sales) or sales <= 0:
                 continue
             
-            # Randomly select 2-5 customers for this delivery
-            n_customers_for_delivery = np.random.randint(2, min(6, len(self.customers_db) + 1))
+            # Calculate minimum customers needed to respect max_payload
+            # Ensure each delivery is at most max_payload
+            min_customers_needed = int(np.ceil(sales / self.max_payload))
+            
+            # Randomly select customers (at least min_customers_needed, up to 5 or available)
+            n_customers_for_delivery = np.random.randint(
+                max(2, min_customers_needed),
+                min(6, len(self.customers_db) + 1)
+            )
             selected_customers = self.customers_db.sample(n=n_customers_for_delivery, replace=False)
             
             # Split sales evenly across customers
@@ -173,27 +199,33 @@ class Router:
         deliveries_df = deliveries_df.copy()
         deliveries_df['truck'] = None
         
+        # Global truck counter across all dates
+        truck_num = 1
+        
         # Group by date
         for date, date_group in deliveries_df.groupby(self.date_col):
             # Sort by destination for locality
-            date_group = date_group.sort_values('destination')
+            date_group = date_group.sort_values('destination').copy()
             
-            # Assign trucks
-            truck_num = 1
+            # Assign trucks for this date
             current_payload = 0
             
-            for idx in date_group.index:
-                units = deliveries_df.loc[idx, 'units']
+            for idx, row in date_group.iterrows():
+                units = row['units']
                 
                 # Check if adding this delivery would exceed max_payload
-                if current_payload + units > self.max_payload:
-                    # Start a new truck
+                if current_payload + units > self.max_payload and current_payload > 0:
+                    # Start a new truck (only if current truck has something)
                     truck_num += 1
                     current_payload = 0
                 
                 # Assign to current truck
                 deliveries_df.loc[idx, 'truck'] = f'truck_{truck_num}'
                 current_payload += units
+            
+            # Move to next truck for next date (each date gets fresh trucks)
+            if current_payload > 0:
+                truck_num += 1
         
         return deliveries_df
 
