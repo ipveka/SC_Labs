@@ -3,7 +3,7 @@
 # Forecasting Configuration
 forecasting:
   # Model selection: 'simple_feedforward', 'deepar', 'transformer'
-  model: 'simple_feedforward'
+  model: 'transformer'
   
   # Model parameters
   epochs: 10

@@ -8,7 +8,7 @@ SC Labs is a proof-of-concept Python application that showcases a complete suppl
 
 ### Key Features
 
-- **Demand Forecasting**: Time series forecasting using GluonTS SimpleFeedForwardEstimator
+- **Demand Forecasting**: Time series forecasting using GluonTS with multiple model options (SimpleFeedForward, DeepAR, Temporal Fusion Transformer)
 - **Inventory Optimization**: Reorder point policy with safety stock calculations
 - **Delivery Routing**: Truck assignment and route optimization with payload constraints
 - **Synthetic Data Generation**: Realistic test data with trend, seasonality, and noise
@@ -151,7 +151,7 @@ python main.py --n_stores 5 --n_products 3 --save
 python main.py --verbose
 
 # Customize forecasting and inventory parameters
-python main.py --forecast_horizon 8 --service_level 0.99 --lead_time 3
+python main.py --forecast_horizon 8 --model_type deepar --service_level 0.99 --lead_time 3
 
 # Customize routing parameters
 python main.py --max_payload 20 --n_customers 50
@@ -167,6 +167,7 @@ python main.py --max_payload 20 --n_customers 50
 
 **Forecasting:**
 - `--forecast_horizon`: Periods to forecast (default: 4)
+- `--model_type`: Forecasting model - 'simple_feedforward', 'deepar', or 'transformer' (default: simple_feedforward)
 
 **Inventory Optimization:**
 - `--planning_horizon`: Periods to simulate (default: 8)
@@ -236,12 +237,15 @@ streamlit run app/app.py
 ```
 
 **Features:**
-- 📊 Interactive data generation with real-time visualization
-- 📈 Neural network forecasting with accuracy metrics
-- 📦 Inventory optimization with dynamic charts
-- 🚚 Route planning with truck utilization analysis
+- 🏠 **Beautiful Landing Page** - Modern interface with module cards and navigation
+- 📊 **Interactive Data Generation** - Real-time visualization with trend analysis
+- 📈 **Neural Network Forecasting** - Choose from 3 ML models (SimpleFeedForward, DeepAR, Transformer)
+- 📦 **Inventory Optimization** - Dynamic charts with safety stock visualization
+- 🚚 **Route Planning** - Truck utilization analysis and distance optimization
+- ⚙️ **Settings Panel** - Centralized configuration for all modules
+- 🔄 **Seamless Navigation** - Navigate between modules with persistent state
 
-The dashboard provides a user-friendly interface to explore all supply chain optimization modules without writing code.
+The dashboard provides a user-friendly interface to explore all supply chain optimization modules without writing code. Each module can be accessed independently, and you can navigate between them at any time.
 
 ## 📓 Interactive Notebooks
 

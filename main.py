@@ -169,6 +169,7 @@ def main(
     n_weeks: int = 52,
     start_date: str = '2024-01-01',
     forecast_horizon: int = 4,
+    model_type: str = 'simple_feedforward',
     planning_horizon: int = 8,
     service_level: float = 0.95,
     lead_time: int = 2,
@@ -186,6 +187,7 @@ def main(
         n_weeks: Number of weeks of historical data
         start_date: Start date for data generation
         forecast_horizon: Number of periods to forecast
+        model_type: Forecasting model ('simple_feedforward', 'deepar', 'transformer')
         planning_horizon: Number of periods for inventory simulation
         service_level: Target service level for safety stock
         lead_time: Order lead time in periods
@@ -231,7 +233,8 @@ def main(
             date_col='date',
             target_col='sales',
             frequency='W',
-            forecast_horizon=forecast_horizon
+            forecast_horizon=forecast_horizon,
+            model_type=model_type
         )
         
         forecaster.fit(train_data)
@@ -344,6 +347,9 @@ if __name__ == "__main__":
     # Forecasting parameters
     parser.add_argument('--forecast_horizon', type=int, default=4,
                         help='Number of periods to forecast')
+    parser.add_argument('--model_type', type=str, default='simple_feedforward',
+                        choices=['simple_feedforward', 'deepar', 'transformer'],
+                        help='Forecasting model type')
     
     # Inventory optimization parameters
     parser.add_argument('--planning_horizon', type=int, default=8,
@@ -374,6 +380,7 @@ if __name__ == "__main__":
         n_weeks=args.n_weeks,
         start_date=args.start_date,
         forecast_horizon=args.forecast_horizon,
+        model_type=args.model_type,
         planning_horizon=args.planning_horizon,
         service_level=args.service_level,
         lead_time=args.lead_time,

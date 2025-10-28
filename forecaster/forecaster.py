@@ -17,7 +17,7 @@ import logging
 import os
 
 from gluonts.dataset.pandas import PandasDataset
-from gluonts.torch import SimpleFeedForwardEstimator
+from gluonts.torch import SimpleFeedForwardEstimator, DeepAREstimator, TemporalFusionTransformerEstimator
 
 from utils.logger import Logger, suppress_warnings
 from utils.config import get_config
@@ -64,6 +64,7 @@ class Forecaster:
         target_col: str = 'sales',
         frequency: str = 'W',
         forecast_horizon: int = 4,
+        model_type: str = None,
         verbose: bool = None
     ) -> None:
         """
@@ -77,6 +78,8 @@ class Forecaster:
             frequency: Pandas frequency string for the time series
                 ('W' = weekly, 'D' = daily, 'M' = monthly, etc.)
             forecast_horizon: Number of future periods to forecast
+            model_type: Type of model ('simple_feedforward', 'deepar', 'transformer')
+                If None, uses config value
             verbose: Show detailed logs (None = use config)
         """
         self.primary_keys = primary_keys
@@ -88,7 +91,13 @@ class Forecaster:
         
         # Load config
         self.config = get_config()
+        self.model_type = model_type if model_type is not None else self.config.get('forecasting', 'model', default='simple_feedforward')
         self.verbose = verbose if verbose is not None else self.config.get('forecasting', 'verbose', default=False)
+        
+        # Validate model type
+        valid_models = ['simple_feedforward', 'deepar', 'transformer']
+        if self.model_type not in valid_models:
+            raise ValueError(f"model_type must be one of {valid_models}, got '{self.model_type}'")
         
         # Initialize logger
         self.logger = Logger('Forecaster', use_colors=self.config.get('logging', 'use_colors', default=True))
@@ -270,20 +279,36 @@ class Forecaster:
             )
             
             # Get model config
-            model_type = self.config.get('forecasting', 'model', default='simple_feedforward')
             epochs = self.config.get('forecasting', 'epochs', default=10)
             lr = self.config.get('forecasting', 'learning_rate', default=0.001)
             
-            # Initialize SimpleFeedForwardEstimator
-            estimator = SimpleFeedForwardEstimator(
-                prediction_length=self.forecast_horizon,
-                lr=lr,
-                trainer_kwargs={
-                    "max_epochs": epochs,
-                    "enable_progress_bar": self.config.get('forecasting', 'show_progress', default=False),
-                    "enable_model_summary": False
-                }
-            )
+            # Initialize estimator based on model type
+            trainer_kwargs = {
+                "max_epochs": epochs,
+                "enable_progress_bar": self.config.get('forecasting', 'show_progress', default=False),
+                "enable_model_summary": False
+            }
+            
+            if self.model_type == 'simple_feedforward':
+                estimator = SimpleFeedForwardEstimator(
+                    prediction_length=self.forecast_horizon,
+                    lr=lr,
+                    trainer_kwargs=trainer_kwargs
+                )
+            elif self.model_type == 'deepar':
+                estimator = DeepAREstimator(
+                    prediction_length=self.forecast_horizon,
+                    lr=lr,
+                    trainer_kwargs=trainer_kwargs
+                )
+            elif self.model_type == 'transformer':
+                estimator = TemporalFusionTransformerEstimator(
+                    prediction_length=self.forecast_horizon,
+                    lr=lr,
+                    trainer_kwargs=trainer_kwargs
+                )
+            else:
+                raise ValueError(f"Unsupported model type: {self.model_type}")
             
             # Suppress output during training
             if not self.verbose:
