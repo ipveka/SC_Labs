@@ -1,26 +1,45 @@
 """
-Forecaster module for demand forecasting using GluonTS.
+Forecaster module for demand forecasting using LightGBM.
 
 This module provides time series forecasting capabilities for supply chain
-demand planning using the GluonTS library with SimpleFeedForwardEstimator.
+demand planning using LightGBM with automated feature engineering.
 """
 
-from typing import List, Optional
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from typing import List, Optional, Dict
 import pandas as pd
 import numpy as np
-from gluonts.dataset.pandas import PandasDataset
-from gluonts.torch import SimpleFeedForwardEstimator
-from gluonts.torch.model.simple_feedforward import SimpleFeedForwardNetworkTrainer
+import warnings
+
+try:
+    import lightgbm as lgb
+except ImportError:
+    raise ImportError("LightGBM is required. Install with: pip install lightgbm")
+
+from utils.logger import Logger, suppress_warnings
+from utils.config import get_config
+
+# Suppress warnings
+suppress_warnings()
 
 
 class Forecaster:
     """
-    A forecasting class for time series demand prediction.
+    A forecasting class for time series demand prediction using LightGBM.
     
-    This class uses GluonTS SimpleFeedForwardEstimator to train models on
+    This class uses LightGBM with automated feature engineering to train models on
     historical time series data and generate forecasts for future periods.
     It supports multiple time series grouped by primary keys (e.g., store-product
     combinations).
+    
+    Features generated:
+    - Temporal: day_of_week, week_of_year, month, quarter, year
+    - Lag features: previous 1, 2, 3, 4 periods
+    - Rolling statistics: mean, std, min, max over windows [3, 4, 8]
+    - Categorical encodings: all primary keys
     
     Attributes:
         primary_keys (List[str]): Column names used to group time series
@@ -29,7 +48,7 @@ class Forecaster:
         target_col (str): Name of the target variable to forecast
         frequency (str): Pandas frequency string ('W' for weekly, 'D' for daily)
         forecast_horizon (int): Number of periods to forecast into the future
-        model: Trained GluonTS predictor (None until fit() is called)
+        model: Trained LightGBM model (None until fit() is called)
     
     Example:
         >>> forecaster = Forecaster(
@@ -49,7 +68,9 @@ class Forecaster:
         date_col: str = 'date',
         target_col: str = 'sales',
         frequency: str = 'W',
-        forecast_horizon: int = 4
+        forecast_horizon: int = 4,
+        model_type: str = None,  # Kept for compatibility, not used
+        verbose: bool = None
     ) -> None:
         """
         Initialize the Forecaster with configuration parameters.
@@ -62,14 +83,125 @@ class Forecaster:
             frequency: Pandas frequency string for the time series
                 ('W' = weekly, 'D' = daily, 'M' = monthly, etc.)
             forecast_horizon: Number of future periods to forecast
+            model_type: Kept for compatibility (not used with LightGBM)
+            verbose: Show detailed logs (None = use config)
         """
         self.primary_keys = primary_keys
         self.date_col = date_col
         self.target_col = target_col
         self.frequency = frequency
         self.forecast_horizon = forecast_horizon
-        self.model: Optional[object] = None
+        self.model: Optional[lgb.Booster] = None
+        self.feature_cols: List[str] = []
+        self.categorical_features: List[str] = []
+        
+        # Load config
+        self.config = get_config()
+        self.verbose = verbose if verbose is not None else self.config.get('forecasting', 'verbose', default=False)
+        
+        # Initialize logger
+        self.logger = Logger('Forecaster', use_colors=self.config.get('logging', 'use_colors', default=True))
 
+    def create_temporal_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create temporal features from date column.
+        
+        Args:
+            df: DataFrame with date column
+            
+        Returns:
+            DataFrame with added temporal features
+        """
+        df = df.copy()
+        df[self.date_col] = pd.to_datetime(df[self.date_col])
+        
+        # Temporal features
+        df['day_of_week'] = df[self.date_col].dt.dayofweek
+        df['week_of_year'] = df[self.date_col].dt.isocalendar().week.astype(int)
+        df['month'] = df[self.date_col].dt.month
+        df['quarter'] = df[self.date_col].dt.quarter
+        df['year'] = df[self.date_col].dt.year
+        df['day_of_month'] = df[self.date_col].dt.day
+        
+        return df
+    
+    def create_lag_features(self, df: pd.DataFrame, lags: List[int] = [1, 2, 3, 4]) -> pd.DataFrame:
+        """
+        Create lag features for each time series group.
+        
+        IMPORTANT: This must be called ONLY on training data to prevent leakage.
+        For prediction, lags are computed from known historical values.
+        
+        Args:
+            df: DataFrame with time series data
+            lags: List of lag periods to create
+            
+        Returns:
+            DataFrame with added lag features
+        """
+        df = df.copy()
+        df = df.sort_values(self.primary_keys + [self.date_col])
+        
+        for lag in lags:
+            df[f'lag_{lag}'] = df.groupby(self.primary_keys)[self.target_col].shift(lag)
+        
+        return df
+    
+    def create_rolling_features(
+        self, 
+        df: pd.DataFrame, 
+        windows: List[int] = [3, 4, 8]
+    ) -> pd.DataFrame:
+        """
+        Create rolling window statistics for each time series group.
+        
+        IMPORTANT: Uses shift(1) to prevent leakage - only uses past data.
+        
+        Args:
+            df: DataFrame with time series data
+            windows: List of window sizes for rolling statistics
+            
+        Returns:
+            DataFrame with added rolling features
+        """
+        df = df.copy()
+        df = df.sort_values(self.primary_keys + [self.date_col])
+        
+        for window in windows:
+            # Shift by 1 to ensure we only use past data (no leakage)
+            rolling = df.groupby(self.primary_keys)[self.target_col].shift(1).rolling(window=window, min_periods=1)
+            
+            df[f'rolling_mean_{window}'] = rolling.mean().reset_index(level=0, drop=True)
+            df[f'rolling_std_{window}'] = rolling.std().reset_index(level=0, drop=True)
+            df[f'rolling_min_{window}'] = rolling.min().reset_index(level=0, drop=True)
+            df[f'rolling_max_{window}'] = rolling.max().reset_index(level=0, drop=True)
+        
+        return df
+    
+    def engineer_features(self, df: pd.DataFrame, is_training: bool = True) -> pd.DataFrame:
+        """
+        Apply all feature engineering steps.
+        
+        Args:
+            df: Input DataFrame
+            is_training: If True, this is training data. If False, this is prediction data.
+            
+        Returns:
+            DataFrame with all engineered features
+        """
+        df = df.copy()
+        
+        # Temporal features
+        df = self.create_temporal_features(df)
+        
+        # Lag features (safe - uses shift)
+        df = self.create_lag_features(df)
+        
+        # Rolling features (safe - uses shift(1) internally)
+        df = self.create_rolling_features(df)
+        
+        return df
+    
     def prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Prepare and clean time series data for forecasting.
@@ -151,12 +283,6 @@ class Forecaster:
                 how='left'
             )
             
-            # Fill missing values with forward fill
-            merged[self.target_col] = merged[self.target_col].fillna(method='ffill')
-            
-            # If still NaN at the beginning, use backward fill
-            merged[self.target_col] = merged[self.target_col].fillna(method='bfill')
-            
             # If still NaN (all values were NaN), fill with 0
             merged[self.target_col] = merged[self.target_col].fillna(0)
             
@@ -172,11 +298,10 @@ class Forecaster:
 
     def fit(self, df: pd.DataFrame) -> None:
         """
-        Train the forecasting model on historical time series data.
+        Train the LightGBM forecasting model on historical time series data.
         
-        This method converts the DataFrame to GluonTS format, groups data by
-        primary keys to create multiple time series, and trains a
-        SimpleFeedForwardEstimator model.
+        This method engineers features, prepares training data, and trains a
+        LightGBM model with proper validation to prevent overfitting.
         
         Args:
             df: Training DataFrame with columns matching primary_keys,
@@ -199,79 +324,123 @@ class Forecaster:
         if df.empty:
             raise ValueError("Training DataFrame is empty")
         
+        # Log start
+        if self.verbose:
+            self.logger.info(f"Training forecaster on {len(df)} records")
+        
         # Warn if insufficient history
-        min_periods = self.forecast_horizon * 2
+        min_periods = max(12, self.forecast_horizon * 2)
         for keys, group in df.groupby(self.primary_keys):
             if len(group) < min_periods:
-                print(f"Warning: Time series {keys} has only {len(group)} periods. "
-                      f"Recommended minimum: {min_periods}")
+                self.logger.warning(f"Time series {keys} has only {len(group)} periods (recommended: {min_periods})")
         
         # Prepare data
         df_clean = self.prepare_data(df)
         
-        # Ensure date column is datetime
-        df_clean[self.date_col] = pd.to_datetime(df_clean[self.date_col])
+        # Engineer features
+        df_features = self.engineer_features(df_clean, is_training=True)
         
+        # Identify feature columns
+        temporal_features = ['day_of_week', 'week_of_year', 'month', 'quarter', 'year', 'day_of_month']
+        lag_features = [col for col in df_features.columns if col.startswith('lag_')]
+        rolling_features = [col for col in df_features.columns if col.startswith('rolling_')]
+        
+        # Categorical features (primary keys)
+        self.categorical_features = self.primary_keys.copy()
+        
+        # All feature columns
+        self.feature_cols = self.primary_keys + temporal_features + lag_features + rolling_features
+        
+        # Remove rows with NaN in features (due to lags/rolling windows)
+        df_train = df_features.dropna(subset=self.feature_cols + [self.target_col]).copy()
+        
+        if len(df_train) == 0:
+            raise ValueError("No valid training data after feature engineering. Need more historical data.")
+        
+        if self.verbose:
+            self.logger.info(f"Training samples after feature engineering: {len(df_train)}")
+            self.logger.info(f"Features: {len(self.feature_cols)} ({len(lag_features)} lags, {len(rolling_features)} rolling)")
+        
+        # Prepare training data
+        X_train = df_train[self.feature_cols].copy()
+        y_train = df_train[self.target_col].values
+        
+        # Encode categorical features
+        for cat_col in self.categorical_features:
+            X_train[cat_col] = X_train[cat_col].astype('category')
+        
+        # Create validation set (last 20% of data chronologically)
+        split_idx = int(len(X_train) * 0.8)
+        X_train_split = X_train.iloc[:split_idx]
+        y_train_split = y_train[:split_idx]
+        X_val = X_train.iloc[split_idx:]
+        y_val = y_train[split_idx:]
+        
+        # LightGBM parameters
+        params = {
+            'objective': 'regression',
+            'metric': 'rmse',
+            'boosting_type': 'gbdt',
+            'num_leaves': 31,
+            'learning_rate': 0.05,
+            'feature_fraction': 0.8,
+            'bagging_fraction': 0.8,
+            'bagging_freq': 5,
+            'verbose': -1,
+            'seed': 42
+        }
+        
+        # Create datasets
+        train_data = lgb.Dataset(
+            X_train_split, 
+            label=y_train_split,
+            categorical_feature=self.categorical_features
+        )
+        
+        val_data = lgb.Dataset(
+            X_val,
+            label=y_val,
+            categorical_feature=self.categorical_features,
+            reference=train_data
+        )
+        
+        # Train model
         try:
-            # Convert to GluonTS PandasDataset format
-            # GluonTS expects: item_id (for grouping), timestamp, target
-            gluon_df = df_clean.copy()
-            
-            # Create item_id by combining primary keys
-            if len(self.primary_keys) == 1:
-                gluon_df['item_id'] = gluon_df[self.primary_keys[0]].astype(str)
-            else:
-                gluon_df['item_id'] = gluon_df[self.primary_keys].apply(
-                    lambda row: '_'.join(row.astype(str)), axis=1
-                )
-            
-            # Rename columns to GluonTS expected names
-            gluon_df = gluon_df.rename(columns={
-                self.date_col: 'timestamp',
-                self.target_col: 'target'
-            })
-            
-            # Create PandasDataset
-            dataset = PandasDataset.from_long_dataframe(
-                gluon_df[['item_id', 'timestamp', 'target']],
-                item_id='item_id',
-                timestamp='timestamp',
-                target='target',
-                freq=self.frequency
+            self.model = lgb.train(
+                params,
+                train_data,
+                num_boost_round=200,
+                valid_sets=[train_data, val_data],
+                valid_names=['train', 'valid'],
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=20, verbose=False),
+                    lgb.log_evaluation(period=0 if not self.verbose else 50)
+                ]
             )
             
-            # Initialize SimpleFeedForwardEstimator
-            estimator = SimpleFeedForwardEstimator(
-                prediction_length=self.forecast_horizon,
-                freq=self.frequency,
-                trainer_kwargs={
-                    "max_epochs": 10,
-                    "learning_rate": 1e-3
-                }
-            )
-            
-            # Train the model
-            self.model = estimator.train(dataset)
-            
+            if self.verbose:
+                self.logger.success(f"Model trained successfully (best iteration: {self.model.best_iteration})")
+                
         except Exception as e:
             raise RuntimeError(f"Model training failed: {str(e)}") from e
 
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Generate forecasts for future periods using the trained model.
+        Generate forecasts for future periods using the trained LightGBM model.
         
-        This method creates predictions for each primary key combination and
-        returns a unified DataFrame containing both historical data (with
-        sample='train' and prediction=NaN) and forecast data (with sample='test'
-        and prediction values).
+        This method creates predictions for each primary key combination using
+        recursive forecasting (each prediction becomes input for the next).
+        Returns a unified DataFrame containing both in-sample predictions (with
+        sample='train' and prediction values) and out-of-sample forecasts (with 
+        sample='test' and prediction values).
         
         Args:
             df: DataFrame containing historical data (same format as training data)
         
         Returns:
             DataFrame with columns: primary_keys, date_col, target_col,
-            'sample' ('train' or 'test'), and 'prediction' (NaN for train,
-            forecasted values for test)
+            'sample' ('train' or 'test'), and 'prediction' (in-sample predictions
+            for train, forecasted values for test)
         
         Raises:
             RuntimeError: If model has not been trained (fit() not called)
@@ -279,7 +448,7 @@ class Forecaster:
         
         Example:
             >>> forecasts = forecaster.predict(historical_data)
-            >>> # forecasts contains both historical and predicted values
+            >>> # forecasts contains both in-sample and out-of-sample predictions
             >>> train_data = forecasts[forecasts['sample'] == 'train']
             >>> test_data = forecasts[forecasts['sample'] == 'test']
         """
@@ -295,54 +464,114 @@ class Forecaster:
         df_clean = self.prepare_data(df)
         df_clean[self.date_col] = pd.to_datetime(df_clean[self.date_col])
         
-        # Create historical data with sample='train' and prediction=NaN
+        # Generate in-sample predictions for historical data
         historical = df_clean.copy()
         historical['sample'] = 'train'
-        historical['prediction'] = np.nan
+        
+        # Engineer features for in-sample prediction
+        historical_features = self.engineer_features(historical, is_training=False)
+        
+        # Get features that exist in the data
+        available_features = [f for f in self.feature_cols if f in historical_features.columns]
+        
+        if available_features:
+            X_historical = historical_features[available_features].copy()
+            
+            # Encode categorical features
+            for cat_col in self.categorical_features:
+                if cat_col in X_historical.columns:
+                    X_historical[cat_col] = X_historical[cat_col].astype('category')
+            
+            # Make in-sample predictions
+            try:
+                in_sample_preds = self.model.predict(X_historical, num_iteration=self.model.best_iteration)
+                in_sample_preds = np.maximum(0, in_sample_preds)  # Ensure non-negative
+                historical['prediction'] = in_sample_preds
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Failed to generate in-sample predictions: {str(e)}")
+                historical['prediction'] = np.nan
+        else:
+            historical['prediction'] = np.nan
         
         # Generate forecasts for each primary key combination
         forecast_dfs = []
         
         for keys, group in df_clean.groupby(self.primary_keys):
             try:
-                # Prepare data for GluonTS prediction
-                gluon_df = group.copy()
+                # Sort by date
+                group = group.sort_values(self.date_col).copy()
                 
-                # Create item_id
-                if len(self.primary_keys) == 1:
-                    item_id = str(keys)
-                else:
-                    item_id = '_'.join(str(k) for k in keys)
-                
-                gluon_df['item_id'] = item_id
-                gluon_df = gluon_df.rename(columns={
-                    self.date_col: 'timestamp',
-                    self.target_col: 'target'
-                })
-                
-                # Create dataset for this time series
-                dataset = PandasDataset.from_long_dataframe(
-                    gluon_df[['item_id', 'timestamp', 'target']],
-                    item_id='item_id',
-                    timestamp='timestamp',
-                    target='target',
-                    freq=self.frequency
-                )
-                
-                # Generate forecast
-                forecast_iter = self.model.predict(dataset)
-                forecast = next(forecast_iter)
-                
-                # Extract forecast values (mean prediction)
-                forecast_values = forecast.mean
+                # Get last date
+                last_date = group[self.date_col].max()
                 
                 # Create future dates
-                last_date = group[self.date_col].max()
                 future_dates = pd.date_range(
                     start=last_date + pd.Timedelta(1, unit=self.frequency),
                     periods=self.forecast_horizon,
                     freq=self.frequency
                 )
+                
+                # Initialize forecast storage
+                forecast_values = []
+                
+                # Recursive forecasting: predict one step at a time
+                for step, future_date in enumerate(future_dates):
+                    # Create a row for this future period
+                    future_row = pd.DataFrame({self.date_col: [future_date]})
+                    
+                    # Add primary key values
+                    if isinstance(keys, tuple):
+                        for i, key_col in enumerate(self.primary_keys):
+                            future_row[key_col] = keys[i]
+                    else:
+                        future_row[self.primary_keys[0]] = keys
+                    
+                    # Add placeholder target (will be replaced with prediction)
+                    future_row[self.target_col] = 0
+                    
+                    # Combine historical + previous predictions + current row
+                    combined = pd.concat([group, future_row], ignore_index=True)
+                    
+                    # Engineer features for the combined data
+                    combined_features = self.engineer_features(combined, is_training=False)
+                    
+                    # Get the last row (our prediction target)
+                    pred_row = combined_features.iloc[[-1]]
+                    
+                    # Check if all required features are present
+                    missing_features = [f for f in self.feature_cols if f not in pred_row.columns]
+                    if missing_features:
+                        # Fill missing features with 0
+                        for feat in missing_features:
+                            pred_row[feat] = 0
+                    
+                    # Prepare features for prediction
+                    X_pred = pred_row[self.feature_cols].copy()
+                    
+                    # Encode categorical features
+                    for cat_col in self.categorical_features:
+                        X_pred[cat_col] = X_pred[cat_col].astype('category')
+                    
+                    # Make prediction
+                    pred_value = self.model.predict(X_pred, num_iteration=self.model.best_iteration)[0]
+                    pred_value = max(0, pred_value)  # Ensure non-negative
+                    
+                    forecast_values.append(pred_value)
+                    
+                    # Add this prediction to the group for next iteration
+                    new_row = pd.DataFrame({
+                        self.date_col: [future_date],
+                        self.target_col: [pred_value]
+                    })
+                    
+                    if isinstance(keys, tuple):
+                        for i, key_col in enumerate(self.primary_keys):
+                            new_row[key_col] = keys[i]
+                    else:
+                        new_row[self.primary_keys[0]] = keys
+                    
+                    group = pd.concat([group, new_row], ignore_index=True)
                 
                 # Create forecast DataFrame
                 forecast_df = pd.DataFrame({
@@ -362,7 +591,8 @@ class Forecaster:
                 forecast_dfs.append(forecast_df)
                 
             except Exception as e:
-                print(f"Warning: Failed to generate forecast for {keys}: {str(e)}")
+                if self.verbose:
+                    self.logger.warning(f"Failed to generate forecast for {keys}: {str(e)}")
                 continue
         
         # Combine historical and forecast data

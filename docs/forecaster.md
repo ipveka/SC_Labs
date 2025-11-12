@@ -2,24 +2,49 @@
 
 ## Overview
 
-The Forecaster module provides time series demand forecasting capabilities for supply chain optimization. It uses the GluonTS library with a SimpleFeedForwardEstimator to train neural network models on historical sales data and generate future demand predictions.
+The Forecaster module provides time series demand forecasting capabilities for supply chain optimization. It uses LightGBM gradient boosting with automated feature engineering to train models on historical sales data and generate future demand predictions.
 
 ### Key Features
 
 - **Multi-series forecasting**: Supports forecasting multiple time series simultaneously (e.g., different store-product combinations)
-- **Automatic data preparation**: Handles missing dates, aggregates duplicates, and fills gaps
-- **GluonTS integration**: Leverages state-of-the-art deep learning forecasting models
+- **Automated feature engineering**: Creates temporal, lag, and rolling window features automatically
+- **No data leakage**: Proper train/test splits and feature engineering to prevent information leakage
+- **LightGBM integration**: Fast, efficient gradient boosting with categorical feature support
+- **Recursive forecasting**: Multi-step ahead predictions using previous forecasts as inputs
 - **Flexible configuration**: Customizable forecast horizon, frequency, and grouping keys
 
-### GluonTS Usage
+### Feature Engineering
 
-GluonTS is a probabilistic time series modeling toolkit developed by Amazon. This module uses the `SimpleFeedForwardEstimator`, which implements a simple feed-forward neural network suitable for quick training and reasonable accuracy on small to medium datasets.
+The module automatically generates the following features:
 
-**Model Configuration:**
-- **Estimator**: SimpleFeedForwardEstimator
-- **Training epochs**: 10
-- **Learning rate**: 1e-3
-- **Prediction type**: Point forecasts (mean values)
+**Temporal Features:**
+- `day_of_week`: Day of the week (0-6)
+- `week_of_year`: Week number in the year (1-52)
+- `month`: Month (1-12)
+- `quarter`: Quarter (1-4)
+- `year`: Year
+- `day_of_month`: Day of the month (1-31)
+
+**Lag Features:**
+- `lag_1`, `lag_2`, `lag_3`, `lag_4`: Previous 1-4 period values
+
+**Rolling Window Features (windows: 3, 4, 8):**
+- `rolling_mean_X`: Rolling mean over X periods
+- `rolling_std_X`: Rolling standard deviation over X periods
+- `rolling_min_X`: Rolling minimum over X periods
+- `rolling_max_X`: Rolling maximum over X periods
+
+**Categorical Features:**
+- All primary keys (e.g., store, product) are encoded as categorical features
+
+### Data Leakage Prevention
+
+The module implements several safeguards to prevent data leakage:
+
+1. **Lag features**: Use `shift()` to only access past values
+2. **Rolling features**: Use `shift(1)` before rolling to ensure only past data is used
+3. **Train/test split**: Chronological split with 80/20 ratio for validation
+4. **Recursive forecasting**: Each prediction uses only known historical values and previous predictions
 
 ## Class: Forecaster
 
@@ -46,134 +71,86 @@ forecaster = Forecaster(
 | `target_col` | `str` | `'sales'` | Name of the column containing values to forecast |
 | `frequency` | `str` | `'W'` | Pandas frequency string: `'W'` (weekly), `'D'` (daily), `'M'` (monthly), etc. |
 | `forecast_horizon` | `int` | `4` | Number of future periods to forecast |
+| `verbose` | `bool` | `None` | Show detailed logs (None = use config) |
 
 ### Attributes
 
-- `model`: Trained GluonTS predictor (None until `fit()` is called)
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `model` | `lgb.Booster` | Trained LightGBM model (None until `fit()` is called) |
+| `feature_cols` | `List[str]` | List of feature column names used for training |
+| `categorical_features` | `List[str]` | List of categorical feature names |
 
 ## Methods
 
-### prepare_data()
+### fit(df: pd.DataFrame) -> None
 
-Prepares and cleans time series data for forecasting by aggregating, ensuring continuous date ranges, and filling missing values.
+Train the LightGBM forecasting model on historical time series data.
 
-**Signature:**
-```python
-def prepare_data(df: pd.DataFrame) -> pd.DataFrame
-```
+**Parameters:**
+- `df` (pd.DataFrame): Training DataFrame with columns matching `primary_keys`, `date_col`, and `target_col`
 
-**Input:**
-- `df`: DataFrame with columns matching `primary_keys`, `date_col`, and `target_col`
-
-**Output:**
-- Cleaned DataFrame with continuous date range and no missing values
-
-**Processing Steps:**
-1. Validates required columns exist
-2. Converts date column to datetime type
-3. Aggregates data by primary keys and date (handles duplicates)
-4. Creates continuous date range for each time series
-5. Fills missing values using forward fill, then backward fill
-6. Returns sorted, cleaned DataFrame
+**Raises:**
+- `ValueError`: If DataFrame has insufficient data for training
+- `RuntimeError`: If model training fails
 
 **Example:**
 ```python
 import pandas as pd
+import numpy as np
 
-df = pd.DataFrame({
-    'store': ['A', 'A', 'A', 'A'],
-    'product': ['X', 'X', 'X', 'X'],
-    'date': ['2024-01-01', '2024-01-08', '2024-01-22', '2024-01-29'],  # Missing 2024-01-15
-    'sales': [100, 150, 120, 180]
-})
-
-clean_df = forecaster.prepare_data(df)
-# Result will have 5 rows with 2024-01-15 filled in
-```
-
-### fit()
-
-Trains the forecasting model on historical time series data.
-
-**Signature:**
-```python
-def fit(df: pd.DataFrame) -> None
-```
-
-**Input:**
-- `df`: Training DataFrame with historical data
-
-**Output:**
-- None (stores trained model in `self.model`)
-
-**Processing Steps:**
-1. Validates input data
-2. Warns if time series have insufficient history (< 2x forecast horizon)
-3. Prepares data using `prepare_data()`
-4. Converts DataFrame to GluonTS PandasDataset format
-5. Creates item IDs by combining primary keys
-6. Initializes SimpleFeedForwardEstimator
-7. Trains model and stores in `self.model`
-
-**Example:**
-```python
+# Create training data
 train_df = pd.DataFrame({
-    'store': ['A'] * 52 + ['B'] * 52,
-    'product': ['X'] * 52 + ['X'] * 52,
-    'date': pd.date_range('2023-01-01', periods=52, freq='W').tolist() * 2,
-    'sales': np.random.randint(50, 200, 104)
+    'store': ['A'] * 30,
+    'product': ['X'] * 30,
+    'date': pd.date_range('2024-01-01', periods=30, freq='W'),
+    'sales': np.random.randint(50, 200, 30)
 })
 
+# Train model
 forecaster.fit(train_df)
-# Model is now trained and ready for predictions
 ```
 
-**Recommendations:**
-- Provide at least 2x forecast_horizon periods of history per time series
-- More history generally improves forecast accuracy
-- For weekly data with 4-week horizon, aim for at least 8-12 weeks of history
+**Training Process:**
+1. Prepares and cleans data (fills gaps, handles missing values)
+2. Engineers features (temporal, lag, rolling)
+3. Removes rows with NaN features (due to lags/rolling windows)
+4. Splits data chronologically (80% train, 20% validation)
+5. Trains LightGBM with early stopping
 
-### predict()
+**Model Parameters:**
+- Objective: regression
+- Metric: RMSE
+- Boosting type: GBDT
+- Number of leaves: 31
+- Learning rate: 0.05
+- Feature fraction: 0.8
+- Bagging fraction: 0.8
+- Early stopping rounds: 20
+- Max boost rounds: 200
 
-Generates forecasts for future periods using the trained model.
+### predict(df: pd.DataFrame) -> pd.DataFrame
 
-**Signature:**
-```python
-def predict(df: pd.DataFrame) -> pd.DataFrame
-```
+Generate forecasts for future periods using the trained model.
 
-**Input:**
-- `df`: DataFrame containing historical data (same format as training data)
+**Parameters:**
+- `df` (pd.DataFrame): DataFrame containing historical data (same format as training data)
 
-**Output:**
-- DataFrame with both historical and forecasted data
+**Returns:**
+- `pd.DataFrame`: DataFrame with columns:
+  - All `primary_keys` columns
+  - `date_col`: Date/timestamp
+  - `target_col`: Actual values (NaN for future periods)
+  - `sample`: 'train' for historical data, 'test' for forecasts
+  - `prediction`: NaN for historical data, forecasted values for future periods
 
-**Output Schema:**
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `primary_keys` | varies | Grouping columns (e.g., store, product) |
-| `date_col` | datetime | Date/timestamp |
-| `target_col` | float | Actual historical values (NaN for forecast periods) |
-| `sample` | str | `'train'` for historical, `'test'` for forecast |
-| `prediction` | float | NaN for historical, forecasted values for future |
-
-**Processing Steps:**
-1. Validates model has been trained
-2. Prepares input data
-3. Creates historical records with `sample='train'` and `prediction=NaN`
-4. For each time series (primary key combination):
-   - Converts to GluonTS format
-   - Generates forecast using trained model
-   - Extracts mean prediction values
-   - Creates future date range
-   - Builds forecast records with `sample='test'`
-5. Combines historical and forecast data
-6. Returns unified DataFrame
+**Raises:**
+- `RuntimeError`: If model has not been trained (`fit()` not called)
+- `ValueError`: If input DataFrame is invalid
 
 **Example:**
 ```python
-# After training the model
+# Generate forecasts
 forecasts = forecaster.predict(train_df)
 
 # Separate historical and forecast data
@@ -183,44 +160,56 @@ future = forecasts[forecasts['sample'] == 'test']
 print(future[['store', 'product', 'date', 'prediction']])
 ```
 
-**Example Output:**
+**Prediction Process:**
+1. Prepares historical data
+2. For each time series group:
+   - Creates future date range
+   - Recursively predicts one step at a time:
+     - Engineers features using historical + previous predictions
+     - Makes prediction with LightGBM
+     - Adds prediction to history for next step
+3. Combines historical and forecast data
 
-```
-   store product       date  prediction
-0      A       X 2024-01-01         NaN
-1      A       X 2024-01-08         NaN
-...
-50     A       X 2024-12-25         NaN
-51     A       X 2025-01-01       145.3
-52     A       X 2025-01-08       152.7
-53     A       X 2025-01-15       148.9
-54     A       X 2025-01-22       151.2
-```
+### prepare_data(df: pd.DataFrame) -> pd.DataFrame
 
-## Complete Usage Example
+Prepare and clean time series data for forecasting.
+
+**Parameters:**
+- `df` (pd.DataFrame): Input DataFrame
+
+**Returns:**
+- `pd.DataFrame`: Cleaned DataFrame with continuous date range
+
+**Process:**
+1. Validates required columns exist
+2. Converts date column to datetime
+3. Aggregates duplicates by summing
+4. Creates continuous date range for each time series
+5. Fills missing values with 0
+
+### engineer_features(df: pd.DataFrame, is_training: bool = True) -> pd.DataFrame
+
+Apply all feature engineering steps.
+
+**Parameters:**
+- `df` (pd.DataFrame): Input DataFrame
+- `is_training` (bool): If True, this is training data
+
+**Returns:**
+- `pd.DataFrame`: DataFrame with all engineered features
+
+**Process:**
+1. Creates temporal features from date column
+2. Creates lag features (shift by 1-4 periods)
+3. Creates rolling window features (shift by 1, then rolling)
+
+## Usage Examples
+
+### Basic Usage
 
 ```python
-import pandas as pd
-import numpy as np
 from forecaster.forecaster import Forecaster
-
-# Generate sample data
-np.random.seed(42)
-dates = pd.date_range('2023-01-01', periods=52, freq='W')
-data = []
-
-for store in ['A', 'B', 'C']:
-    for product in ['X', 'Y']:
-        for date in dates:
-            sales = np.random.randint(50, 200)
-            data.append({
-                'store': store,
-                'product': product,
-                'date': date,
-                'sales': sales
-            })
-
-df = pd.DataFrame(data)
+import pandas as pd
 
 # Initialize forecaster
 forecaster = Forecaster(
@@ -231,117 +220,142 @@ forecaster = Forecaster(
     forecast_horizon=4
 )
 
-# Split data into train/test
-train_df = df[df['date'] < '2024-10-01']
-test_df = df[df['date'] >= '2024-10-01']
+# Load historical data
+data = pd.read_csv('sales_data.csv')
+data['date'] = pd.to_datetime(data['date'])
 
 # Train model
-print("Training model...")
-forecaster.fit(train_df)
+forecaster.fit(data)
 
 # Generate forecasts
-print("Generating forecasts...")
-forecasts = forecaster.predict(train_df)
+forecasts = forecaster.predict(data)
 
-# View forecast results
-forecast_only = forecasts[forecasts['sample'] == 'test']
-print("\nForecasts:")
-print(forecast_only.head(12))
-
-# Calculate accuracy metrics (if actuals available)
-# This would require comparing predictions with actual test data
+# Extract future predictions
+future = forecasts[forecasts['sample'] == 'test']
+print(future)
 ```
 
-## Error Handling
+### Multiple Time Series
 
-The Forecaster module includes comprehensive error handling:
+```python
+# Data with multiple stores and products
+data = pd.DataFrame({
+    'store': ['A', 'A', 'B', 'B'] * 20,
+    'product': ['X', 'Y', 'X', 'Y'] * 20,
+    'date': pd.date_range('2024-01-01', periods=80, freq='W'),
+    'sales': np.random.randint(50, 200, 80)
+})
 
-### Common Errors
+# Forecaster handles multiple series automatically
+forecaster = Forecaster(
+    primary_keys=['store', 'product'],
+    forecast_horizon=8
+)
 
-1. **Empty DataFrame**
-   ```
-   ValueError: Input DataFrame is empty
-   ```
-   - Ensure your DataFrame contains data before calling methods
+forecaster.fit(data)
+forecasts = forecaster.predict(data)
 
-2. **Missing Columns**
-   ```
-   ValueError: Missing required columns: ['date', 'sales']
-   ```
-   - Verify all required columns exist in your DataFrame
+# Forecasts for each store-product combination
+for (store, product), group in forecasts.groupby(['store', 'product']):
+    future = group[group['sample'] == 'test']
+    print(f"\nStore {store}, Product {product}:")
+    print(future[['date', 'prediction']])
+```
 
-3. **Model Not Trained**
-   ```
-   RuntimeError: Model has not been trained. Call fit() first.
-   ```
-   - Call `fit()` before calling `predict()`
+### Custom Configuration
 
-4. **Training Failure**
-   ```
-   RuntimeError: Model training failed: [error details]
-   ```
-   - Check data quality, ensure sufficient history, verify GluonTS installation
+```python
+# Daily frequency with longer horizon
+forecaster = Forecaster(
+    primary_keys=['location', 'sku'],
+    date_col='timestamp',
+    target_col='demand',
+    frequency='D',  # Daily
+    forecast_horizon=14,  # 2 weeks
+    verbose=True  # Show training progress
+)
 
-### Warnings
+forecaster.fit(daily_data)
+forecasts = forecaster.predict(daily_data)
+```
 
-- **Insufficient History**: Warns when time series have fewer than 2x forecast_horizon periods
-- **Forecast Generation Failure**: Prints warning but continues with other time series
+## Best Practices
+
+### Data Requirements
+
+- **Minimum history**: At least 12 periods (or 2× forecast horizon, whichever is larger)
+- **Continuous dates**: The module fills gaps, but large gaps may affect quality
+- **Sufficient variance**: Time series with zero variance get minimal safety stock
+
+### Feature Engineering
+
+- **Lag features**: Automatically created for 1-4 periods back
+- **Rolling windows**: Use windows of 3, 4, and 8 periods
+- **No leakage**: All features use only past data (shift before rolling)
+
+### Model Training
+
+- **Validation split**: Last 20% of data used for validation
+- **Early stopping**: Stops if validation RMSE doesn't improve for 20 rounds
+- **Categorical encoding**: Primary keys automatically encoded as categorical
+
+### Forecasting
+
+- **Recursive approach**: Each prediction uses previous predictions as inputs
+- **Non-negative**: Predictions are clipped to be non-negative
+- **Uncertainty**: LightGBM provides point forecasts (not probabilistic)
 
 ## Performance Considerations
 
 ### Training Time
-- **Small datasets** (< 10 time series, < 100 periods): < 1 minute
-- **Medium datasets** (10-50 time series, 100-500 periods): 1-5 minutes
-- **Large datasets** (> 50 time series, > 500 periods): 5-15 minutes
 
-### Memory Usage
-- Approximately 100-500 MB for typical supply chain datasets
-- Scales with number of time series and history length
+- **Fast**: LightGBM is much faster than deep learning models
+- **Scalability**: Handles hundreds of time series efficiently
+- **Memory**: Feature engineering creates temporary columns
 
-### Optimization Tips
-1. Use appropriate `forecast_horizon` (don't forecast too far ahead)
-2. Limit training epochs if speed is critical
-3. Consider training on a subset of time series for initial testing
-4. Use GPU acceleration if available (requires PyTorch GPU setup)
+### Prediction Time
 
-## Integration with Other Modules
+- **Recursive**: Each forecast step requires feature engineering
+- **Overhead**: Minimal compared to model training
+- **Batch**: All time series predicted in one pass
 
-The Forecaster module outputs are designed to integrate seamlessly with downstream modules:
+## Troubleshooting
 
-### Optimizer Module
-```python
-# Forecaster output feeds directly into Optimizer
-forecasts = forecaster.predict(train_df)
-optimizer = Optimizer(primary_keys=['store', 'product'])
-inventory_plan = optimizer.simulate(forecasts)
+### Common Issues
+
+**Issue**: "No valid training data after feature engineering"
+- **Cause**: Insufficient historical data for lag/rolling features
+- **Solution**: Increase training data to at least 12 periods
+
+**Issue**: Predictions are constant
+- **Cause**: Insufficient variance in training data or overfitting
+- **Solution**: Check data quality, increase training data, or adjust model parameters
+
+**Issue**: "Model has not been trained"
+- **Cause**: Calling `predict()` before `fit()`
+- **Solution**: Call `fit()` first to train the model
+
+## Configuration
+
+The module reads configuration from `config.yaml`:
+
+```yaml
+forecasting:
+  num_boost_round: 200
+  learning_rate: 0.05
+  num_leaves: 31
+  early_stopping_rounds: 20
+  verbose: false
 ```
 
-### Router Module
-```python
-# Forecaster output can be used for delivery planning
-forecasts = forecaster.predict(train_df)
-router = Router(primary_keys=['store', 'product'])
-deliveries = router.distribute_demand(forecasts)
-```
+## Dependencies
 
-## Limitations and Future Enhancements
+- `pandas>=1.5.0`: Data manipulation
+- `numpy>=1.23.0`: Numerical operations
+- `lightgbm>=4.0.0`: Gradient boosting model
 
-### Current Limitations
-- Uses simple feed-forward network (not state-of-the-art)
-- Point forecasts only (no prediction intervals)
-- Limited hyperparameter tuning
-- No automatic model selection
+## See Also
 
-### Potential Enhancements
-1. **Advanced Models**: Support for DeepAR, Transformer, or Prophet models
-2. **Probabilistic Forecasts**: Generate prediction intervals and quantiles
-3. **Hyperparameter Tuning**: Automatic optimization of model parameters
-4. **Feature Engineering**: Support for external regressors (holidays, promotions)
-5. **Model Evaluation**: Built-in accuracy metrics (RMSE, MAE, MAPE)
-6. **Ensemble Methods**: Combine multiple models for better accuracy
-
-## References
-
-- [GluonTS Documentation](https://ts.gluon.ai/)
-- [SimpleFeedForwardEstimator API](https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.simple_feedforward.html)
-- [Pandas Frequency Strings](https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases)
+- [Optimizer Module](optimizer.md): Inventory optimization using forecasts
+- [Router Module](router.md): Delivery routing using forecasts
+- [Main Pipeline](../README.md): Complete workflow integration
