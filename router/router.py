@@ -146,10 +146,14 @@ class Router:
             min_customers_needed = int(np.ceil(sales / self.max_payload))
             
             # Randomly select customers (at least min_customers_needed, up to 5 or available)
-            n_customers_for_delivery = np.random.randint(
-                max(2, min_customers_needed),
-                min(6, len(self.customers_db) + 1)
-            )
+            min_cust = max(2, min_customers_needed)
+            max_cust = min(6, len(self.customers_db) + 1)
+            
+            # Ensure min_cust doesn't exceed max_cust
+            if min_cust >= max_cust:
+                n_customers_for_delivery = min(min_customers_needed, len(self.customers_db))
+            else:
+                n_customers_for_delivery = np.random.randint(min_cust, max_cust)
             selected_customers = self.customers_db.sample(n=n_customers_for_delivery, replace=False)
             
             # Split sales evenly across customers

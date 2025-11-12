@@ -1,22 +1,66 @@
 # SC Labs Configuration File
-
-# Forecasting Configuration
-forecasting:
-  # Model selection: 'simple_feedforward', 'deepar', 'transformer'
-  model: 'transformer'
+#
+# =============================================================================
+# HORIZON PARAMETERS EXPLAINED
+# =============================================================================
+#
+# The system uses two key horizon parameters:
+#
+# 1. FORECAST_HORIZON (forecasting.default_forecast_horizon)
+#    - Number of periods to predict into the future
+#    - Used by: Forecaster to generate predictions
+#    - Example: forecast_horizon=4 means predict next 4 weeks
+#
+# 2. PLANNING_HORIZON (inventory.default_planning_horizon)
+#    - Number of periods to simulate inventory management
+#    - Used by: Optimizer to run inventory simulation
+#    - Should be >= forecast_horizon
+#    - Example: planning_horizon=8 means simulate 8 weeks of inventory
+#
+# Typical workflow:
+#   Historical Data → Forecaster (forecast_horizon=4) → 4 weeks of predictions
+#                  → Optimizer (planning_horizon=8) → 8 weeks of inventory plan
+#                  → Router → Delivery routes for forecasted demand
+#
+# =============================================================================
+# DATA GENERATION
+# =============================================================================
+data_generation:
+  # Default parameters for synthetic data
+  default_n_stores: 3
+  default_n_products: 2
+  default_n_weeks: 52
+  default_start_date: '2024-01-01'
+  default_seed: 42
   
-  # Model parameters
-  epochs: 10
-  learning_rate: 0.001
-  num_layers: 2
-  hidden_size: 40
+  # Logging
+  verbose: true
+
+# =============================================================================
+# FORECASTING
+# =============================================================================
+forecasting:
+  # Forecast horizon (number of periods to predict)
+  # This is used by both forecaster and inventory optimizer
+  default_forecast_horizon: 12
+  
+  # LightGBM model parameters
+  num_boost_round: 200
+  learning_rate: 0.05
+  num_leaves: 31
+  early_stopping_rounds: 20
   
   # Training settings
   verbose: false
-  show_progress: false
 
-# Inventory Optimization Configuration
+# =============================================================================
+# INVENTORY OPTIMIZATION
+# =============================================================================
 inventory:
+  # Planning horizon (number of periods to simulate)
+  # Should be >= forecast_horizon
+  default_planning_horizon: 12
+  
   # Default policy parameters
   default_service_level: 0.95
   default_lead_time: 2
@@ -25,22 +69,17 @@ inventory:
   # Logging
   verbose: true
 
-# Routing Configuration
+# =============================================================================
+# ROUTING
+# =============================================================================
 routing:
   # Default parameters
   default_max_payload: 100
+  default_n_customers: 30
   default_origin: '08020'
   
   # Algorithm: 'nearest_neighbor', 'greedy'
   algorithm: 'nearest_neighbor'
-  
-  # Logging
-  verbose: true
-
-# Data Generation Configuration
-data_generation:
-  # Default parameters
-  default_seed: 42
   
   # Logging
   verbose: true
@@ -51,7 +90,7 @@ logging:
   level: 'INFO'
   
   # Format
-  format: 'clean'  # 'clean' or 'detailed'
+  format: 'clean'
   
   # Show timestamps
   show_timestamps: false

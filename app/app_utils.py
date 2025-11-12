@@ -49,43 +49,65 @@ def create_sales_boxplot(data):
 
 
 def create_forecast_chart(subset):
-    """Create forecast vs actual comparison chart."""
+    """Create forecast vs actual comparison chart with in-sample predictions."""
     fig = go.Figure()
     
-    # Historical
+    # Historical actuals
     train = subset[subset['sample'] == 'train']
     fig.add_trace(go.Scatter(
         x=train['date'],
         y=train['sales'],
         mode='lines+markers',
-        name='Historical',
-        line=dict(color='blue')
+        name='Actual (Train)',
+        line=dict(color='#2E86AB', width=2),
+        marker=dict(size=6)
     ))
     
-    # Actual test
+    # In-sample predictions
+    if 'prediction' in train.columns and train['prediction'].notna().any():
+        fig.add_trace(go.Scatter(
+            x=train['date'],
+            y=train['prediction'],
+            mode='lines',
+            name='Fitted (Train)',
+            line=dict(color='#A23B72', width=2, dash='dot'),
+            opacity=0.7
+        ))
+    
+    # Future actuals (if available)
     test = subset[subset['sample'] == 'test']
-    fig.add_trace(go.Scatter(
-        x=test['date'],
-        y=test['sales'],
-        mode='lines+markers',
-        name='Actual',
-        line=dict(color='green')
-    ))
+    if test['sales'].notna().any():
+        fig.add_trace(go.Scatter(
+            x=test['date'],
+            y=test['sales'],
+            mode='lines+markers',
+            name='Actual (Test)',
+            line=dict(color='#06A77D', width=2),
+            marker=dict(size=6)
+        ))
     
-    # Forecast
+    # Out-of-sample forecast
     fig.add_trace(go.Scatter(
         x=test['date'],
         y=test['prediction'],
         mode='lines+markers',
-        name='Forecast',
-        line=dict(color='red', dash='dash')
+        name='Forecast (Test)',
+        line=dict(color='#F18F01', width=3, dash='dash'),
+        marker=dict(size=8, symbol='diamond')
     ))
     
     fig.update_layout(
         xaxis_title='Date',
         yaxis_title='Sales (units)',
-        height=400,
-        hovermode='x unified'
+        height=450,
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
     
     return fig

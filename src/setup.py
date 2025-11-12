@@ -74,8 +74,7 @@ def verify_installation():
     required_packages = [
         "pandas",
         "numpy",
-        "gluonts",
-        "torch",
+        "lightgbm",
         "scipy",
         "streamlit"
     ]

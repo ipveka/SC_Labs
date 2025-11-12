@@ -1,0 +1,18 @@
+[server]
+# Server settings
+headless = true
+port = 8501
+
+# Security - let Streamlit use defaults
+# enableXsrfProtection and enableCORS are handled automatically
+
+[browser]
+# Don't automatically open browser
+gatherUsageStats = false
+
+[theme]
+# Optional: customize theme
+primaryColor = "#667eea"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
