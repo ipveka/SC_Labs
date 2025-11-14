@@ -75,7 +75,7 @@ inventory:
 routing:
   # Default parameters
   default_max_payload: 100
-  default_n_customers: 30
+  default_n_customers: 15
   default_origin: '08020'
   
   # Algorithm: 'nearest_neighbor', 'greedy'
