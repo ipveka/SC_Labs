@@ -3,8 +3,13 @@
 headless = true
 port = 8501
 
-# Security - let Streamlit use defaults
-# enableXsrfProtection and enableCORS are handled automatically
+# Security settings - both must be true to work together
+enableXsrfProtection = true
+enableCORS = true
+
+# CORS origins (required when enableXsrfProtection is true)
+# Allow localhost for development
+enableWebsocketCompression = false
 
 [browser]
 # Don't automatically open browser
