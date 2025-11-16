@@ -15,9 +15,18 @@ enableWebsocketCompression = false
 # Don't automatically open browser
 gatherUsageStats = false
 
+[client]
+# Hide default Streamlit links in sidebar
+showSidebarNavigation = false
+
 [theme]
-# Optional: customize theme
+# Custom theme matching app design
 primaryColor = "#667eea"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f0f2f6"
 textColor = "#262730"
+
+[ui]
+# Hide default Streamlit UI elements
+hideTopBar = false
+hideSidebarNav = true

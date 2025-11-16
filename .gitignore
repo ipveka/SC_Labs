@@ -48,6 +48,9 @@ coverage.xml
 *.cover
 *.py.cover
 .hypothesis/
+
+# Lightning logs (PyTorch Lightning / LightGBM training logs)
+lightning_logs/
 .pytest_cache/
 cover/
 

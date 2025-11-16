@@ -1,4 +1,50 @@
 /* SC Labs - Supply Chain Optimization Dashboard Styles */
+/* Professional, consistent, and polished design system */
+
+/* ============================================================================
+   DESIGN TOKENS - Color Palette & Variables
+   ============================================================================ */
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --primary-color: #667eea;
+    --primary-dark: #5568d3;
+    --secondary-color: #764ba2;
+    --accent-color: #48bb78;
+    --warning-color: #ed8936;
+    --error-color: #f56565;
+    --text-dark: #2d3748;
+    --text-medium: #4a5568;
+    --text-light: #718096;
+    --bg-white: #ffffff;
+    --bg-light: #f7fafc;
+    --bg-lighter: #edf2f7;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
+    --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================================
+   GLOBAL STYLES
+   ============================================================================ */
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
 
 /* Hide default Streamlit elements */
 #MainMenu {
@@ -9,141 +55,503 @@ footer {
     visibility: hidden;
 }
 
+header[data-testid="stHeader"] {
+    background-color: transparent;
+}
+
+/* Hide sidebar navigation links */
+[data-testid="stSidebarNav"] {
+    display: none;
+}
+
+section[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+/* Hide "Pages" section in sidebar */
+.css-1544g2n {
+    display: none;
+}
+
 /* Main container styling */
 .main {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     padding: 0;
 }
 
-/* Landing page hero section with animation */
+/* ============================================================================
+   LANDING PAGE - Hero Section
+   ============================================================================ */
 .hero-section {
     text-align: center;
-    padding: 4rem 2rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 4rem 2rem 3rem;
+    background: var(--primary-gradient);
     color: white;
-    border-radius: 20px;
-    margin-bottom: 3rem;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    border-radius: var(--radius-xl);
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-xl);
     animation: fadeIn 0.8s ease-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .hero-title {
     font-size: 4rem;
     font-weight: 800;
-    margin-bottom: 1rem;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    margin-bottom: 0.5rem;
+    text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
     animation: fadeInUp 0.6s ease-out;
+    letter-spacing: -0.02em;
+    position: relative;
 }
 
 .hero-subtitle {
-    font-size: 1.5rem;
-    font-weight: 300;
-    margin-bottom: 2rem;
+    font-size: 1.6rem;
+    font-weight: 400;
+    margin-bottom: 1rem;
     animation: fadeInUp 0.8s ease-out;
+    opacity: 0.95;
+    position: relative;
 }
 
 .hero-description {
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     max-width: 800px;
-    margin: 0 auto 3rem;
-    line-height: 1.8;
+    margin: 0 auto;
+    line-height: 1.6;
     animation: fadeInUp 1s ease-out;
+    opacity: 0.9;
+    font-weight: 300;
+    position: relative;
 }
 
-/* Module cards with animation */
+/* ============================================================================
+   MODULE CARDS - Landing Page
+   ============================================================================ */
 .module-card {
-    background: white;
-    border-radius: 20px;
+    background: var(--bg-white);
+    border-radius: var(--radius-xl);
     padding: 2.5rem;
     margin: 1rem 0;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-slow);
     border: 2px solid transparent;
     height: 100%;
     animation: fadeInUp 0.6s ease-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.module-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-gradient);
+    transform: scaleX(0);
+    transition: transform var(--transition-normal);
+}
+
+.module-card:hover::before {
+    transform: scaleX(1);
 }
 
 .module-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 20px 50px rgba(102, 126, 234, 0.3);
-    border-color: #667eea;
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-color);
 }
 
 .module-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
     display: block;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .module-title {
-    font-size: 1.8rem;
+    font-size: 1.75rem;
     font-weight: 700;
-    color: #2d3748;
+    color: var(--text-dark);
     margin-bottom: 1rem;
+    letter-spacing: -0.01em;
 }
 
 .module-description {
     font-size: 1rem;
-    color: #4a5568;
-    line-height: 1.6;
+    color: var(--text-medium);
+    line-height: 1.7;
     margin-bottom: 1.5rem;
 }
 
 .module-features {
-    font-size: 0.9rem;
-    color: #718096;
+    font-size: 0.95rem;
+    color: var(--text-light);
     margin-bottom: 1.5rem;
     text-align: left;
+    list-style: none;
+    padding: 0;
 }
 
-/* Content container with animation */
+.module-features li {
+    padding: 0.4rem 0;
+    line-height: 1.6;
+}
+
+/* ============================================================================
+   CONTENT CONTAINERS - All Pages
+   ============================================================================ */
 .content-container {
-    background: white;
-    border-radius: 20px;
-    padding: 2rem;
+    background: var(--bg-white);
+    border-radius: var(--radius-xl);
+    padding: 2.5rem;
     margin: 1rem 0;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    box-shadow: var(--shadow-lg);
     animation: fadeInUp 0.5s ease-out;
 }
 
-/* Buttons - bold and improved */
+.content-container h2 {
+    color: var(--text-dark);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+}
+
+.content-container h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.content-container h4 {
+    color: var(--text-medium);
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* ============================================================================
+   BUTTONS - Consistent Styling
+   ============================================================================ */
 .stButton > button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     padding: 0.75rem 2rem;
     font-size: 1rem;
-    font-weight: 700;
-    transition: all 0.3s ease;
+    font-weight: 600;
+    transition: var(--transition-normal);
+    box-shadow: var(--shadow-sm);
+    letter-spacing: 0.01em;
 }
 
 .stButton > button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
 }
 
 .stButton > button:active {
     transform: translateY(0);
+    box-shadow: var(--shadow-sm);
 }
 
-/* Disabled buttons (active page in navigation) */
+/* Primary buttons (type="primary") */
+.stButton > button[kind="primary"] {
+    background: var(--primary-gradient);
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+}
+
+/* Disabled buttons (navigation active state) */
 .stButton > button:disabled {
-    background: white !important;
-    color: #667eea !important;
-    border: 2px solid #667eea !important;
-    font-weight: 700 !important;
+    background: var(--bg-white) !important;
+    color: var(--primary-color) !important;
+    border: 2px solid var(--primary-color) !important;
+    font-weight: 600 !important;
     opacity: 1 !important;
     cursor: default !important;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15) !important;
 }
 
 .stButton > button:disabled:hover {
     transform: none !important;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15) !important;
 }
 
-/* Animations */
+/* ============================================================================
+   METRICS - Enhanced Display
+   ============================================================================ */
+[data-testid="stMetric"] {
+    background: var(--bg-light);
+    padding: 1.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-normal);
+    animation: fadeIn 0.8s ease-out;
+}
+
+[data-testid="stMetric"]:hover {
+    background: var(--bg-white);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+[data-testid="stMetricValue"] {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    animation: fadeIn 0.8s ease-out;
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    animation: fadeIn 0.6s ease-out;
+}
+
+[data-testid="stMetricDelta"] {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* ============================================================================
+   TABS - Consistent Styling
+   ============================================================================ */
+[data-testid="stTabs"] {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    background: var(--bg-lighter);
+    padding: 0.5rem;
+    border-radius: var(--radius-lg);
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 3rem;
+    padding: 0 1.5rem;
+    background: transparent;
+    border-radius: var(--radius-md);
+    color: var(--text-medium);
+    font-weight: 600;
+    transition: var(--transition-normal);
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background: var(--bg-white);
+    color: var(--primary-color);
+}
+
+.stTabs [aria-selected="true"] {
+    background: var(--bg-white) !important;
+    color: var(--primary-color) !important;
+    box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================================
+   ALERTS & MESSAGES
+   ============================================================================ */
+[data-testid="stAlert"] {
+    animation: slideInRight 0.5s ease-out;
+    border-radius: var(--radius-md);
+    border-left-width: 4px;
+    padding: 1rem 1.25rem;
+}
+
+/* Success messages */
+.stSuccess {
+    background-color: rgba(72, 187, 120, 0.1);
+    border-left-color: var(--accent-color);
+}
+
+/* Info messages */
+.stInfo {
+    background-color: rgba(102, 126, 234, 0.1);
+    border-left-color: var(--primary-color);
+}
+
+/* Warning messages */
+.stWarning {
+    background-color: rgba(237, 137, 54, 0.1);
+    border-left-color: var(--warning-color);
+}
+
+/* Error messages */
+.stError {
+    background-color: rgba(245, 101, 101, 0.1);
+    border-left-color: var(--error-color);
+}
+
+/* ============================================================================
+   DATAFRAMES & TABLES
+   ============================================================================ */
+[data-testid="stDataFrame"] {
+    animation: fadeInUp 0.6s ease-out;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+[data-testid="stDataFrame"] table {
+    font-size: 0.9rem;
+}
+
+[data-testid="stDataFrame"] thead {
+    background: var(--bg-lighter);
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+[data-testid="stDataFrame"] tbody tr:hover {
+    background: var(--bg-light);
+}
+
+/* ============================================================================
+   CHARTS & VISUALIZATIONS
+   ============================================================================ */
+[data-testid="stVegaLiteChart"],
+[data-testid="stPlotlyChart"] {
+    animation: fadeInUp 0.7s ease-out;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+/* ============================================================================
+   EXPANDERS
+   ============================================================================ */
+[data-testid="stExpander"] {
+    animation: slideInLeft 0.5s ease-out;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    transition: var(--transition-normal);
+    margin: 1rem 0;
+}
+
+[data-testid="stExpander"]:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-color);
+}
+
+[data-testid="stExpander"] summary {
+    font-weight: 600;
+    color: var(--text-dark);
+    padding: 1rem 1.25rem;
+}
+
+[data-testid="stExpander"][open] {
+    box-shadow: var(--shadow-md);
+}
+
+/* ============================================================================
+   FILE UPLOADER
+   ============================================================================ */
+[data-testid="stFileUploader"] {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    transition: var(--transition-normal);
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-light);
+}
+
+/* ============================================================================
+   SLIDERS & INPUTS
+   ============================================================================ */
+.stSlider {
+    padding: 1rem 0;
+}
+
+.stSlider [data-baseweb="slider"] {
+    margin-top: 0.5rem;
+}
+
+.stSlider [data-testid="stTickBar"] {
+    color: var(--text-light);
+}
+
+/* ============================================================================
+   SELECTBOX & INPUTS
+   ============================================================================ */
+.stSelectbox, .stTextInput, .stNumberInput {
+    margin: 0.5rem 0;
+}
+
+[data-baseweb="select"] {
+    border-radius: var(--radius-md);
+}
+
+[data-baseweb="input"] {
+    border-radius: var(--radius-md);
+}
+
+/* ============================================================================
+   DOWNLOAD BUTTON
+   ============================================================================ */
+.stDownloadButton > button {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: var(--transition-normal);
+}
+
+.stDownloadButton > button:hover {
+    background: #38a169;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+}
+
+/* ============================================================================
+   SPINNER & LOADING
+   ============================================================================ */
+.stSpinner > div {
+    border-color: var(--primary-color) transparent transparent transparent;
+}
+
+/* ============================================================================
+   SIDEBAR
+   ============================================================================ */
+[data-testid="stSidebar"] {
+    background: var(--bg-white);
+    border-right: 1px solid var(--border-color);
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: var(--text-dark);
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -186,46 +594,58 @@ footer {
     }
 }
 
-/* Metrics with animation */
-[data-testid="stMetricValue"] {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #667eea;
-    animation: fadeIn 0.8s ease-out;
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
 }
 
-[data-testid="stMetricLabel"] {
-    animation: fadeIn 0.6s ease-out;
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.25rem;
+    }
+    
+    .hero-description {
+        font-size: 1rem;
+    }
+    
+    .module-card {
+        padding: 1.5rem;
+    }
+    
+    .content-container {
+        padding: 1.5rem;
+    }
 }
 
-/* Dataframes and tables */
-[data-testid="stDataFrame"] {
-    animation: fadeInUp 0.6s ease-out;
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+.text-center {
+    text-align: center;
 }
 
-/* Charts */
-[data-testid="stVegaLiteChart"],
-[data-testid="stPlotlyChart"] {
-    animation: fadeInUp 0.7s ease-out;
-}
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
 
-/* Expanders */
-[data-testid="stExpander"] {
-    animation: slideInLeft 0.5s ease-out;
-    transition: all 0.3s ease;
-}
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
 
-/* Tabs */
-[data-testid="stTabs"] {
-    animation: fadeIn 0.5s ease-out;
-}
-
-/* Success/Info/Warning boxes */
-[data-testid="stAlert"] {
-    animation: slideInRight 0.5s ease-out;
-}
-
-/* Smooth scrolling */
-html {
-    scroll-behavior: smooth;
-}
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+.p-4 { padding: 2rem; }
